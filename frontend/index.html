@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark"><title>LocalMind · 本地记忆</title>
+  <link rel="stylesheet" href="/style.css?v=20261026-studio1">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">L</div><div><strong>LocalMind</strong><small>本地个人记忆</small></div></div>
+      <div class="nav-label">工作区</div>
+      <button class="nav active" data-page="home"><span data-icon="home"></span> 今日概览</button>
+      <button class="nav" data-page="timeline"><span data-icon="timeline"></span> 活动时间线</button>
+      <button class="nav" data-page="chat"><span data-icon="chat"></span> 聊天</button>
+      <button class="nav" data-page="reports"><span data-icon="report"></span> 每日总结</button>
+      <div class="sidebar-bottom"><div class="privacy"><span class="privacy-dot"></span><div><b>数据仅在本机</b><small>不连接云端服务</small></div></div><button class="nav" data-page="settings"><span data-icon="settings"></span> 设置</button><div class="version">LOCAL · 0.2.0</div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="breadcrumb">LocalMind <span>/</span> <b id="page-label">今日概览</b></div><div class="top-right"><span id="today-label"></span><button class="icon-btn" id="refresh" title="刷新">↻</button></div></header>
+      <section id="page-home" class="page visible">
+        <div class="page-heading"><div><div class="eyebrow">DAILY OVERVIEW</div><h1>今日活动</h1><p>按应用和时间查看记录，也可以生成带来源的每日总结。</p></div><button class="button primary" id="generate-home"><span>生成今日总结</span></button></div>
+        <div class="status-row">
+          <div class="status-card"><span class="status-icon purple">◉</span><div><small>本地截图与 OCR</small><b id="capture-status">检查中</b><em id="capture-meta"></em></div><span class="pill" id="capture-pill">—</span></div>
+          <div class="status-card"><span class="status-icon blue">◷</span><div><small>ActivityWatch 活动记录</small><b id="aw-status">检查中</b><em id="aw-meta"></em></div><span class="pill" id="aw-pill">—</span></div>
+          <div class="status-card"><span class="status-icon green">✳</span><div><small>本机 Ollama</small><b id="ollama-status">检查中</b><em id="ollama-meta"></em></div><span class="pill" id="ollama-pill">—</span></div>
+        </div>
+        <div class="summary-grid">
+          <article class="panel active-panel"><div class="panel-head"><div><div class="eyebrow">TODAY</div><h2>今日活动</h2></div><button class="text-button" data-goto="timeline">查看时间线 <span>→</span></button></div><div class="metric"><strong id="active-time">—</strong><span>检测到的活跃时间</span></div><div id="top-apps" class="app-bars"><div class="empty">正在读取本地活动…</div></div></article>
+          <article class="panel record-panel"><div class="eyebrow">LOCAL CAPTURE</div><h2>采集控制</h2><p id="record-copy">截图采集与 ActivityWatch 分开控制。启用截图时会进行本地 OCR。</p><div class="record-state"><span class="pulse" id="record-pulse"></span><strong id="record-state-label">截图已暂停</strong></div><button class="button full" id="toggle-capture">开始本地截图采集</button><div class="small-note">默认 30 秒一次 · 原图保留 7 天</div></article>
+        </div>
+        <article class="panel recent-panel"><div class="panel-head"><div><div class="eyebrow">EVIDENCE</div><h2>最近活动</h2></div><button class="text-button" data-goto="timeline">全部活动 <span>→</span></button></div><div id="recent-list" class="activity-list"><div class="empty">暂无活动记录。请启动 ActivityWatch。</div></div></article>
+      </section>
+      <section id="page-timeline" class="page">
+        <div class="page-heading compact"><div><div class="eyebrow">ACTIVITY EVIDENCE</div><h1>活动时间线</h1><p>按类别汇总活动，可切换活跃时段或全天；点击片段查看详情。</p></div><div class="date-control"><input type="date" id="timeline-date"><button class="button" id="timeline-refresh">加载日期</button></div></div>
+        <div class="timeline-stats" id="timeline-stats"></div><article class="panel timeline-panel"><div id="timeline-list" class="timeline-list"><div class="empty">载入中…</div></div></article><article class="panel timeline-detail" id="timeline-detail"><div class="empty">点击图中的活动片段查看详情。</div></article>
+      </section>
+      <section id="page-chat" class="page">
+        <div class="page-heading compact"><div><div class="eyebrow">LOCAL ACTIVITY ASSISTANT</div><h1>聊天</h1><p>根据本机活动记录回答，引用可打开对应证据。</p></div></div>
+        <div class="chat-controls panel">
+          <div class="chat-scope-switch" role="tablist" aria-label="聊天分类"><button type="button" class="selected" data-chat-scope="work" role="tab" aria-selected="true">工作</button><button type="button" data-chat-scope="life" role="tab" aria-selected="false">生活</button></div>
+          <label>从<input type="date" id="chat-from"></label><label>至<input type="date" id="chat-to"></label>
+          <button type="button" class="button" id="chat-week-report">生成本周工作周报</button>
+          <button type="button" class="button primary" id="chat-new">新建对话</button>
+          <p id="chat-context-info" role="status">正在读取所选范围的活动…</p>
+        </div>
+        <div class="chat-layout">
+          <aside class="panel chat-history"><div class="panel-head"><h2>对话记录</h2></div><div id="chat-thread-list" class="chat-thread-list"><div class="empty">载入中…</div></div></aside>
+          <section class="panel chat-panel" aria-label="本地记忆对话">
+            <div class="chat-messages" id="chat-messages"><div class="empty">选择分类或新建对话，开始询问你的活动。</div></div>
+            <div class="chat-composer"><div class="chat-suggestions"><button type="button" data-chat-prompt="总结所选时间范围内我完成的主要工作，并列出有记录依据的事项和待跟进内容。">总结主要工作</button><button type="button" data-chat-prompt="这段时间我主要把时间花在哪里？请按活动证据归纳。">分析时间分配</button></div><div class="chat-input-row"><textarea id="chat-input" rows="2" placeholder="例如：帮我整理本周工作周报，列出完成事项、进展和待办…"></textarea><button type="button" class="button primary" id="chat-send">发送</button></div><small>普通问题直接回答；涉及你的活动时先检索本机记录。生成进度和已等待时间会显示在对话中。</small></div>
+          </section>
+        </div>
+      </section>
+      <section id="page-reports" class="page">
+        <div class="page-heading compact"><div><div class="eyebrow">DAILY REVIEW</div><h1>每日总结</h1><p>模型结论会标注来源；时间统计由程序根据活动区间计算。</p></div><div class="date-control"><input type="date" id="report-date"><button class="button primary" id="generate-report">生成 / 重新生成</button></div></div>
+        <div class="report-layout"><aside class="panel report-history"><div class="panel-head"><h2>历史日报</h2></div><div id="history-list" class="history-list"><div class="empty">暂无历史日报</div></div></aside><article class="panel report-main" id="report-content"><div class="empty report-empty">选择日期，查看或生成总结。</div></article></div>
+      </section>
+      <section id="page-settings" class="page">
+        <div class="page-heading compact"><div><div class="eyebrow">PREFERENCES</div><h1>设置</h1><p>数据目录：<code id="data-path">LocalMind/data</code></p><a class="text-button" href="/README.md">打开中文 README →</a></div><button class="button" id="show-data-location">在 Finder 中打开数据目录</button></div>
+        <div class="settings-grid"><article class="panel settings-panel appearance-panel"><div class="settings-panel-heading"><div><div class="eyebrow">APPEARANCE</div><h2>外观</h2><p>选择整个应用的显示主题。</p></div><span class="setting-current" id="theme-current">深色主题</span></div><div class="theme-options" role="group" aria-label="界面主题"><button type="button" class="theme-option" data-theme-choice="dark"><span class="theme-preview theme-preview-dark"><i></i><i></i><i></i></span><span><b>深色</b><small>适合低光环境</small></span><span class="theme-check" aria-hidden="true">✓</span></button><button type="button" class="theme-option" data-theme-choice="light"><span class="theme-preview theme-preview-light"><i></i><i></i><i></i></span><span><b>浅色</b><small>明亮清晰</small></span><span class="theme-check" aria-hidden="true">✓</span></button></div></article><article class="panel settings-panel capture-panel"><div class="settings-panel-heading"><div><div class="eyebrow">CAPTURE & PRIVACY</div><h2>采集与隐私</h2><p>管理本机记录频率与敏感内容过滤。</p></div></div><div class="settings-fields"><label>截图间隔<input id="setting-interval" type="number" min="10" max="3600"><small>单位：秒</small></label><label>原始截图保留<input id="setting-retention" type="number" min="1" max="365"><small>单位：天</small></label><label>排除应用名称<textarea id="setting-apps" rows="4"></textarea><small>逗号分隔</small></label><label>敏感网站域名<textarea id="setting-domains" rows="4"></textarea><small>逗号分隔；包含子域</small></label></div><div class="settings-actions"><button class="button primary" id="save-settings">保存隐私设置</button></div></article>
+        <article class="panel settings-panel model-panel"><div class="settings-panel-heading"><div><div class="eyebrow">LOCAL MODEL</div><h2>本地模型</h2><p>模型服务仅连接此设备上的 Ollama。</p></div></div><label>Ollama 地址<input id="setting-ollama-url" type="url" value="http://127.0.0.1:11434"><small>仅接受 localhost / 127.0.0.1 / ::1。</small></label><div class="model-fields"><label>模型名称<input id="setting-model" type="text"></label><label>每日自动总结时间<input id="setting-report-time" type="time"></label></div><div class="settings-actions"><button class="button primary" id="save-model">保存模型设置</button></div><div class="separator"></div><div class="setting-info"><span>开机启动</span><b id="launch-status">检查中</b></div><div class="setting-info"><span>ActivityWatch</span><b>独立运行，LocalMind 不控制其采集开关</b></div></article>
+        <article class="panel settings-panel memory-panel"><div class="settings-panel-heading"><div><div class="eyebrow">LOCAL VISUAL MEMORY</div><h2>视觉记忆</h2><p>每 3 秒本机截取前台窗口并运行 Apple Vision OCR；仅当画面内容变化时保留文字观察。Qwen3-VL 按设定间隔分析代表性画面，临时图片处理后删除。</p></div></div><label class="memory-toggle"><input id="setting-memory-enabled" type="checkbox"><span>启用屏幕观察与小时记忆</span></label><div class="model-fields"><label>视觉模型<input id="setting-vision-model" type="text"><small>建议 qwen3-vl:4b-instruct</small></label><label>视觉理解间隔<input id="setting-vision-interval" type="number" min="60" max="3600"><small>秒；默认 300 秒，可调整为 1–60 分钟</small></label></div><p class="small-note">每小时将 OCR 与视觉描述交给当前文本模型（默认 qwen3.5:4b），追加到 data/memories/日期.md；记忆保留 30 天。截图采集总开关关闭时，本功能也会暂停。</p><div class="setting-info"><span>当前状态</span><b id="memory-status">检查中</b></div><div class="settings-actions"><button class="button primary" id="save-memory">保存记忆设置</button></div></article>
+        <article class="panel settings-panel danger-panel"><div class="eyebrow">YOUR DATA</div><h2>删除数据</h2><p>删除所选日期的 LocalMind 活动、截图、OCR 和日报。此操作无法撤销。</p><div class="date-control"><input type="date" id="delete-date"><button class="button danger" id="delete-day">删除所选日期</button></div><p class="small-note">每日总结会另存为 Markdown 文件，截图按保留期限自动清理。</p></article></div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <dialog id="evidence-dialog"><button class="dialog-close" id="evidence-close">×</button><div id="evidence-detail"></div></dialog>
+  <dialog id="image-viewer" aria-label="截图预览"><div class="image-viewer-toolbar"><span id="image-zoom-level">适合窗口</span><div><button type="button" id="image-zoom-out" aria-label="缩小">−</button><button type="button" id="image-zoom-fit">适合窗口</button><button type="button" id="image-zoom-in" aria-label="放大">＋</button><button type="button" id="image-viewer-close" aria-label="关闭图片">完成</button></div></div><div class="image-viewer-stage" id="image-viewer-stage"><img id="viewer-image" alt="截图"></div></dialog>
+  <script src="/app.js?v=20261026-studio1" defer></script>
+</body>
+</html>
