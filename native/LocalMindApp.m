@@ -51,8 +51,37 @@ static OSStatus memoryHotKey(EventHandlerCallRef next, EventRef event, void *con
     NSString *text=selected && CFGetTypeID(selected)==CFStringGetTypeID()? [(__bridge NSString *)selected copy]:@"";
     NSString *window=windowTitle && CFGetTypeID(windowTitle)==CFStringGetTypeID()?[(__bridge NSString *)windowTitle copy]:@"";
     if(focused) CFRelease(focused); if(selected) CFRelease(selected); if(title) CFRelease(title); if(windowTitle) CFRelease(windowTitle); CFRelease(app);
+    if (!text.length && NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier==source.processIdentifier) {
+        // Wait until the shortcut modifiers are released before issuing Copy.
+        NSDate *releaseDeadline=[NSDate dateWithTimeIntervalSinceNow:1.2];
+        while ((CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState)&(kCGEventFlagMaskShift|kCGEventFlagMaskCommand)) && [releaseDeadline timeIntervalSinceNow]>0) {
+            [NSThread sleepForTimeInterval:0.02];
+        }
+        if (!(CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState)&(kCGEventFlagMaskShift|kCGEventFlagMaskCommand))) {
+            NSPasteboard *pasteboard=NSPasteboard.generalPasteboard;
+            NSMutableArray *backup=[NSMutableArray array];
+            for (NSPasteboardItem *item in pasteboard.pasteboardItems) {
+                NSPasteboardItem *copy=[NSPasteboardItem new];
+                for (NSPasteboardType type in item.types) {NSData *data=[item dataForType:type]; if(data)[copy setData:data forType:type];}
+                [backup addObject:copy];
+            }
+            NSInteger before=pasteboard.changeCount;
+            CGEventRef down=CGEventCreateKeyboardEvent(NULL,8,true),up=CGEventCreateKeyboardEvent(NULL,8,false);
+            CGEventSetFlags(down,kCGEventFlagMaskCommand);CGEventSetFlags(up,kCGEventFlagMaskCommand);
+            CGEventPost(kCGHIDEventTap,down);CGEventPost(kCGHIDEventTap,up);CFRelease(down);CFRelease(up);
+            NSDate *deadline=[NSDate dateWithTimeIntervalSinceNow:0.8];
+            while(pasteboard.changeCount==before && [deadline timeIntervalSinceNow]>0) [NSThread sleepForTimeInterval:0.02];
+            if(pasteboard.changeCount!=before) {
+                NSInteger copiedVersion=pasteboard.changeCount;
+                if(NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier==source.processIdentifier)
+                    text=[[pasteboard stringForType:NSPasteboardTypeString] copy]?:@"";
+                // Restore only if nobody has copied newer content in the meantime.
+                if(pasteboard.changeCount==copiedVersion){[pasteboard clearContents];if(backup.count)[pasteboard writeObjects:backup];}
+            }
+        }
+    }
     [NSApp activateIgnoringOtherApps:YES];
-    NSAlert *alert=[NSAlert new]; alert.messageText=@"保存到项目记忆";alert.informativeText=@"⇧⌘M · 保存原文、来源、时间与项目。无法读取选区时，可直接粘贴原文。";
+    NSAlert *alert=[NSAlert new]; alert.messageText=@"保存到项目记忆";alert.informativeText=text.length?@"已读取选中文字，请确认原文并补充项目与说明。":@"未读取到可复制的文字。请先选中文字再按 ⇧⌘M；图片中的文字暂不支持，可在此粘贴。";
     NSView *view=[[NSView alloc] initWithFrame:NSMakeRect(0,0,460,240)];
     NSTextField *project=[[NSTextField alloc] initWithFrame:NSMakeRect(0,205,460,28)];project.placeholderString=@"所属项目";
     NSTextField *note=[[NSTextField alloc] initWithFrame:NSMakeRect(0,165,460,28)];note.placeholderString=@"补充说明，例如：客户确认的最终口径";
@@ -60,7 +89,8 @@ static OSStatus memoryHotKey(EventHandlerCallRef next, EventRef event, void *con
     NSTextView *body=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,440,150)];body.font=[NSFont systemFontOfSize:14];body.string=text;scroll.documentView=body;
     [view addSubview:project];[view addSubview:note];[view addSubview:scroll];alert.accessoryView=view;
     [alert addButtonWithTitle:@"保存记忆"];[alert addButtonWithTitle:@"取消"];
-    if([alert runModal]!=NSAlertFirstButtonReturn || !body.string.length)return;
+    [alert.window makeFirstResponder:text.length?project:body];
+    if([alert runModal]!=NSAlertFirstButtonReturn || ![body.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length)return;
     NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"http://127.0.0.1:8787/api/notes"]];request.HTTPMethod=@"POST";[request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     request.HTTPBody=[NSJSONSerialization dataWithJSONObject:@{@"text":body.string,@"project":project.stringValue,@"note":note.stringValue,@"app":source.localizedName?:@"",@"window":window} options:0 error:nil];
     [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){dispatch_async(dispatch_get_main_queue(),^{NSAlert *done=[NSAlert new];done.messageText=(!error && [(NSHTTPURLResponse *)response statusCode]==201)?@"记忆已保存":@"保存失败，请重试";[done runModal];});}] resume];
