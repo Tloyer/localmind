@@ -26,7 +26,7 @@ cat > "$CONTENTS/Info.plist" <<EOF
 </dict></plist>
 EOF
 clang -fobjc-arc -O2 \
-  -framework Cocoa -framework WebKit \
+  -framework Cocoa -framework WebKit -framework Carbon -framework ApplicationServices \
   "$ROOT/native/LocalMindApp.m" \
   -o "$CONTENTS/MacOS/LocalMind"
 chmod +x "$CONTENTS/MacOS/LocalMind"

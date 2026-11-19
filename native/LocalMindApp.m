@@ -1,6 +1,9 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 #import <unistd.h>
+#import <Carbon/Carbon.h>
+#import <ApplicationServices/ApplicationServices.h>
+static OSStatus memoryHotKey(EventHandlerCallRef next, EventRef event, void *context);
 
 @interface LocalMindAppDelegate : NSObject <NSApplicationDelegate>
 @property(nonatomic, strong) NSWindow *window;
@@ -18,6 +21,10 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [self buildWindow];
+    EventHotKeyRef key;
+    RegisterEventHotKey(46, cmdKey | shiftKey, (EventHotKeyID){'LMEM',1}, GetApplicationEventTarget(), 0, &key);
+    EventTypeSpec spec={kEventClassKeyboard,kEventHotKeyPressed};
+    InstallApplicationEventHandler(memoryHotKey,1,&spec,(__bridge void *)self,NULL);
     [self setStatus:@"正在检查本机服务…"];
     [self.pollTimer invalidate];
     self.pollTimer = [NSTimer scheduledTimerWithTimeInterval:2.0
@@ -26,6 +33,37 @@
                                                     userInfo:nil
                                                      repeats:YES];
     [self checkServices];
+}
+
+- (void)saveSelection {
+    NSRunningApplication *source=NSWorkspace.sharedWorkspace.frontmostApplication;
+    NSDictionary *options=@{(__bridge NSString *)kAXTrustedCheckOptionPrompt:@YES};
+    if (!AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options)) {
+        NSAlert *a=[NSAlert new]; a.messageText=@"请允许 LocalMind 使用辅助功能"; a.informativeText=@"在系统设置授权后，可读取你主动选中的文字。授权后再按 ⇧⌘M。"; [a runModal]; return;
+    }
+    AXUIElementRef app=AXUIElementCreateApplication(source.processIdentifier);
+    CFTypeRef focused=NULL, selected=NULL, title=NULL;
+    AXUIElementCopyAttributeValue(app,kAXFocusedUIElementAttribute,&focused);
+    if(focused) AXUIElementCopyAttributeValue((AXUIElementRef)focused,kAXSelectedTextAttribute,&selected);
+    AXUIElementCopyAttributeValue(app,kAXFocusedWindowAttribute,&title);
+    CFTypeRef windowTitle=NULL;
+    if(title) AXUIElementCopyAttributeValue((AXUIElementRef)title,kAXTitleAttribute,&windowTitle);
+    NSString *text=selected && CFGetTypeID(selected)==CFStringGetTypeID()? [(__bridge NSString *)selected copy]:@"";
+    NSString *window=windowTitle && CFGetTypeID(windowTitle)==CFStringGetTypeID()?[(__bridge NSString *)windowTitle copy]:@"";
+    if(focused) CFRelease(focused); if(selected) CFRelease(selected); if(title) CFRelease(title); if(windowTitle) CFRelease(windowTitle); CFRelease(app);
+    [NSApp activateIgnoringOtherApps:YES];
+    NSAlert *alert=[NSAlert new]; alert.messageText=@"保存到项目记忆";alert.informativeText=@"⇧⌘M · 保存原文、来源、时间与项目。无法读取选区时，可直接粘贴原文。";
+    NSView *view=[[NSView alloc] initWithFrame:NSMakeRect(0,0,460,240)];
+    NSTextField *project=[[NSTextField alloc] initWithFrame:NSMakeRect(0,205,460,28)];project.placeholderString=@"所属项目";
+    NSTextField *note=[[NSTextField alloc] initWithFrame:NSMakeRect(0,165,460,28)];note.placeholderString=@"补充说明，例如：客户确认的最终口径";
+    NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,460,150)];scroll.hasVerticalScroller=YES;
+    NSTextView *body=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,440,150)];body.font=[NSFont systemFontOfSize:14];body.string=text;scroll.documentView=body;
+    [view addSubview:project];[view addSubview:note];[view addSubview:scroll];alert.accessoryView=view;
+    [alert addButtonWithTitle:@"保存记忆"];[alert addButtonWithTitle:@"取消"];
+    if([alert runModal]!=NSAlertFirstButtonReturn || !body.string.length)return;
+    NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"http://127.0.0.1:8787/api/notes"]];request.HTTPMethod=@"POST";[request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    request.HTTPBody=[NSJSONSerialization dataWithJSONObject:@{@"text":body.string,@"project":project.stringValue,@"note":note.stringValue,@"app":source.localizedName?:@"",@"window":window} options:0 error:nil];
+    [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){dispatch_async(dispatch_get_main_queue(),^{NSAlert *done=[NSAlert new];done.messageText=(!error && [(NSHTTPURLResponse *)response statusCode]==201)?@"记忆已保存":@"保存失败，请重试";[done runModal];});}] resume];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
@@ -196,3 +234,5 @@ int main(int argc, const char *argv[]) {
         return NSApplicationMain(argc, argv);
     }
 }
+
+static OSStatus memoryHotKey(EventHandlerCallRef next, EventRef event, void *context) { [(__bridge LocalMindAppDelegate *)context saveSelection]; return noErr; }
